@@ -1,0 +1,1778 @@
+{
+  "info": {
+    "name": "CineBook - Full Flow",
+    "description": "Movie ticket booking microservices system. Everything routes through the API Gateway on :8080. Run the 'Full Flow (in order)' folder top-to-bottom with the Collection Runner for a complete register -> book -> pay -> notify pass -- each request auto-saves the IDs the next one needs into collection variables. Prerequisite: service-registry, config-server, api-gateway, and all 6 business services must be UP (check http://localhost:8761), and docker compose (6x MySQL + RabbitMQ) must be running. A default admin account (username 'admin', password 'Admin123!') is seeded automatically on user-service startup. AUTHORIZATION MODEL: browsing (GET movies/theaters/screens/seats/seat-categories) needs no token; creating/editing/deleting catalog data (theaters, screens, seat categories, movies, showtimes, cast) requires an ADMIN token; creating a booking and reading bookings/payments/notifications requires being logged in as any user (they carry personal data).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "theaterId",
+      "value": ""
+    },
+    {
+      "key": "screenId",
+      "value": ""
+    },
+    {
+      "key": "seatCategoryId",
+      "value": ""
+    },
+    {
+      "key": "movieId",
+      "value": ""
+    },
+    {
+      "key": "showtimeId",
+      "value": ""
+    },
+    {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
+      "key": "bookingReference",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "FULL FLOW (run in order)",
+      "item": [
+        {
+          "name": "1. Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Creates a CUSTOMER account. Change the username/email if you re-run this -- they're unique.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\": \"Test Customer\", \"email\": \"test.customer@example.com\", \"username\": \"testcustomer1\", \"password\": \"Password123!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "    console.log('Saved token =', json.token);",
+                  "}",
+                  "pm.collectionVariables.set('userId', pm.response.json().user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Re-authenticates and refreshes the token (proves the login path independently of register).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"testcustomer1\", \"password\": \"Password123!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "    console.log('Saved token =', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Confirms the JWT from step 1/2 is accepted by user-service's Spring Security filter. Uses {{token}} (the collection's default bearer auth)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Catalog management (theaters/screens/seats/movies/showtimes) requires ROLE_ADMIN. user-service seeds one default admin on startup: username 'admin', password 'Admin123!'. Stored separately as {{adminToken}} so it doesn't overwrite your customer {{token}} from steps 1-2 -- you'll switch back to being 'the customer' again at step 11 (Create Booking).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"admin\", \"password\": \"Admin123!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('adminToken', json.token);",
+                  "    console.log('Saved adminToken =', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Create Theater",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN -- uses {{adminToken}} from step 4.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Test Cineplex\", \"city\": \"Dhaka\", \"address\": \"123 Test Street\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('theaterId', json.id);",
+                  "    console.log('Saved theaterId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Create Screen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/{{theaterId}}/screens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "{{theaterId}}",
+                "screens"
+              ]
+            },
+            "description": "5 rows x 8 seats/row = 40-seat screen. Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Screen 1\", \"totalRows\": 5, \"seatsPerRow\": 8}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('screenId', json.id);",
+                  "    console.log('Saved screenId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Generate Seats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/screens/{{screenId}}/seats/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "screens",
+                "{{screenId}}",
+                "seats",
+                "generate"
+              ]
+            },
+            "description": "One-time seat-grid generation for the screen. categoryCode must match a seeded SeatCategory (theater-service seeds SILVER/GOLD/PREMIUM on startup via DataInitializer). Calling this twice for the same screen returns 400 (InvalidOperationException). Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"categoryCode\": \"GOLD\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('40 seats generated', () => pm.expect(pm.response.json().length).to.eql(40));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Create Movie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies"
+              ]
+            },
+            "description": "genres are resolved-or-created by name -- no need to create Genre rows separately. Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Test Movie\", \"description\": \"A movie created for Postman testing\", \"durationMinutes\": 120, \"language\": \"English\", \"releaseDate\": \"2026-01-01\", \"rating\": 8.5, \"posterUrl\": \"https://example.com/poster.jpg\", \"genres\": [\"Action\", \"Drama\"]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('movieId', json.id);",
+                  "    console.log('Saved movieId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Add Showtime to Movie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}/showtimes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}",
+                "showtimes"
+              ]
+            },
+            "description": "price here is the actual per-ticket price booking-service will charge -- Movie itself has no top-level price, only its showtimes do. Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"startTime\": \"2026-12-01T20:00:00\", \"theaterId\": {{theaterId}}, \"screenId\": {{screenId}}, \"price\": 12.5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('showtimeId', json.id);",
+                  "    console.log('Saved showtimeId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Get Showtime (standalone)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/showtimes/{{showtimeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "showtimes",
+                "{{showtimeId}}"
+              ]
+            },
+            "description": "Public read, no token needed -- this is what booking-service's Feign client calls internally to price a booking.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "description": "Back to being the customer -- uses {{token}} (the collection default), not {{adminToken}}. booking-service looks up the showtime via Feign (movie-service), then the movie/theater/screen, computes amount = showtime.price * seatCount, saves the booking, and publishes booking.confirmed to RabbitMQ. seatCount must not exceed the screen's capacity (totalRows x seatsPerRow = 40 here). Requires being logged in as any user -- a booking always belongs to someone.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerName\": \"Test Customer\", \"customerEmail\": \"test.customer@example.com\", \"showtimeId\": {{showtimeId}}, \"seatCount\": 3}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('amount == 37.5 (3 x 12.50)', () => pm.expect(pm.response.json().amount).to.eql(37.5));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('bookingId', json.id);",
+                  "    console.log('Saved bookingId =', json.id);",
+                  "}",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('bookingReference', json.bookingReference);",
+                  "    console.log('Saved bookingReference =', json.bookingReference);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Get Payment by Booking Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/booking-reference/{{bookingReference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "booking-reference",
+                "{{bookingReference}}"
+              ]
+            },
+            "description": "ASYNC: payment-service consumes booking.confirmed off RabbitMQ and creates this payment (auto COMPLETED, no real gateway). If you get 404 immediately after step 11, wait a second and resend -- message processing isn't instant. Use Collection Runner's delay, or just click Send again. Requires being logged in (contains personal data) -- uses {{token}}."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK (retry if 404 -- async)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('paymentId', json.id);",
+                  "    console.log('Saved paymentId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Get Notification by Booking Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/booking-reference/{{bookingReference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "booking-reference",
+                "{{bookingReference}}"
+              ]
+            },
+            "description": "ASYNC: notification-service consumes payment.completed off RabbitMQ and logs+persists a simulated email (no real provider wired up). Same retry note as step 12. Requires being logged in -- uses {{token}}."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK (retry if 404 -- async)', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('notificationId', json.id);",
+                  "    console.log('Saved notificationId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Run this whole folder with the Collection Runner for one full pass: register (customer) -> login -> admin login -> build a theater/screen/seats -> build a movie/showtime (all as admin) -> book as the customer again -> auto-pay -> auto-notify. Each request saves what the next one needs, so you can also just click through them top to bottom by hand."
+    },
+    {
+      "name": "Users (user-service, JWT required)",
+      "item": [
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\": \"Test Customer Updated\", \"email\": \"test.customer@example.com\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change My Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "password"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"currentPassword\": \"Password123!\", \"newPassword\": \"NewPassword456!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[Admin] Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "user-service seeds one default admin on startup (DataInitializer): username 'admin', password 'Admin123!'. This logs in as that account and stores the token separately as {{adminToken}} so it doesn't overwrite your regular {{token}} from the FULL FLOW folder. (This is also step 4 of the FULL FLOW folder -- kept here too as a standalone reference.)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"admin\", \"password\": \"Admin123!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('adminToken', json.token);",
+                  "    console.log('Saved adminToken =', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[Admin] List All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN -- run '[Admin] Login' above first.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[Admin] Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN -- run '[Admin] Login' above first.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\": \"New Admin\", \"email\": \"admin2@example.com\", \"username\": \"admin2\", \"password\": \"Password123!\", \"roles\": [\"ADMIN\"]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Theaters (theater-service, public reads / admin writes)",
+      "item": [
+        {
+          "name": "List Theaters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Theater by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/{{theaterId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "{{theaterId}}"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Theater",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/{{theaterId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "{{theaterId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Test Cineplex Updated\", \"city\": \"Dhaka\", \"address\": \"456 New Street\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Theater (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/{{theaterId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "{{theaterId}}"
+              ]
+            },
+            "description": "Sets active=false, does not hard-delete the row. Don't run this until you're done testing -- everything downstream depends on theaterId. Requires ROLE_ADMIN.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Screens (theater-service, public reads / admin writes)",
+      "item": [
+        {
+          "name": "List Screens for Theater",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/{{theaterId}}/screens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "{{theaterId}}",
+                "screens"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Screen by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/screens/{{screenId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "screens",
+                "{{screenId}}"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Screen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/screens/{{screenId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "screens",
+                "{{screenId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Screen 1 Updated\", \"totalRows\": 6, \"seatsPerRow\": 8}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Screen (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/screens/{{screenId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "screens",
+                "{{screenId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Seats (theater-service, public reads)",
+      "item": [
+        {
+          "name": "Get Seat Map for Screen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/screens/{{screenId}}/seats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "screens",
+                "{{screenId}}",
+                "seats"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Seat by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seats/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seats",
+                "1"
+              ]
+            },
+            "description": "Replace 1 with a real seat id from the seat map or from step 7's response. Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Seat Categories (theater-service, public reads / admin writes)",
+      "item": [
+        {
+          "name": "List Seat Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seat-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seat-categories"
+              ]
+            },
+            "description": "Pre-seeded on startup: SILVER (x1.00), GOLD (x1.25), PREMIUM (x1.50). Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Seat Category by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seat-categories/{{seatCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seat-categories",
+                "{{seatCategoryId}}"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Seat Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seat-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seat-categories"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"VIP\", \"code\": \"VIP\", \"priceMultiplier\": 2.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('seatCategoryId', json.id);",
+                  "    console.log('Saved seatCategoryId =', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Seat Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seat-categories/{{seatCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seat-categories",
+                "{{seatCategoryId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"VIP\", \"code\": \"VIP\", \"priceMultiplier\": 2.25}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Seat Category (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/theaters/seat-categories/{{seatCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "theaters",
+                "seat-categories",
+                "{{seatCategoryId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Movies (movie-service, public reads / admin writes)",
+      "item": [
+        {
+          "name": "Get Movie by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List/Search Movies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies?title=Test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "title",
+                  "value": "Test"
+                }
+              ]
+            },
+            "description": "Optional query params: genre, title (substring, case-insensitive). Omit both to list everything. Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Movie",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"Test Movie Updated\", \"description\": \"Updated description\", \"durationMinutes\": 130, \"language\": \"English\", \"releaseDate\": \"2026-01-01\", \"rating\": 9.0, \"posterUrl\": \"https://example.com/poster.jpg\", \"genres\": [\"Action\"]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Movie",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}"
+              ]
+            },
+            "description": "Hard delete, cascades to its showtimes and cast. Don't run until done testing. Requires ROLE_ADMIN.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Showtimes for Movie",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}/showtimes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}",
+                "showtimes"
+              ]
+            },
+            "description": "Public -- no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Cast Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}/cast",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "movies",
+                "{{movieId}}",
+                "cast"
+              ]
+            },
+            "description": "Requires ROLE_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"actorName\": \"Jane Doe\", \"roleInMovie\": \"Detective Smith\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bookings (booking-service, login required)",
+      "item": [
+        {
+          "name": "List Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "description": "Requires being logged in (any user) -- uses {{token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Booking by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Requires being logged in -- uses {{token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Booking by Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/reference/{{bookingReference}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "reference",
+                "{{bookingReference}}"
+              ]
+            },
+            "description": "Requires being logged in -- uses {{token}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments (payment-service, read-only, login required)",
+      "item": [
+        {
+          "name": "List Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "description": "Requires being logged in (any user) -- uses {{token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}"
+              ]
+            },
+            "description": "Requires being logged in -- uses {{token}}."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications (notification-service, read-only, login required)",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "Requires being logged in (any user) -- uses {{token}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notification by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationId}}"
+              ]
+            },
+            "description": "Requires being logged in -- uses {{token}}."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

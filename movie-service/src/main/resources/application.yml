@@ -1,0 +1,12 @@
+server:
+  port: 8082
+  forward-headers-strategy: framework
+spring:
+  application:
+    name: movie-service
+  config:
+    import: optional:configserver:http://localhost:8888
+
+app:
+  jwt:
+    secret: c2FtcGxlLWpzdy1zZWNyZXQtZm9yLWNpbmVib29rLXVzZXItc2VydmljZS0zMi1ieXRlcyEh

@@ -1,0 +1,125 @@
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/**
+            - id: user-service-auth
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/auth/**
+            - id: movie-service
+              uri: lb://MOVIE-SERVICE
+              predicates:
+                - Path=/api/movies/**
+            - id: theater-service
+              uri: lb://THEATER-SERVICE
+              predicates:
+                - Path=/api/theaters/**
+            - id: booking-service
+              uri: lb://BOOKING-SERVICE
+              predicates:
+                - Path=/api/bookings/**
+            - id: payment-service
+              uri: lb://PAYMENT-SERVICE
+              predicates:
+                - Path=/api/payments/**
+            - id: notification-service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api/notifications/**
+            - id: user-service-docs
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api-docs/user-service
+              filters:
+                - RewritePath=/api-docs/user-service, /v3/api-docs
+            - id: movie-service-docs
+              uri: lb://MOVIE-SERVICE
+              predicates:
+                - Path=/api-docs/movie-service
+              filters:
+                - RewritePath=/api-docs/movie-service, /v3/api-docs
+            - id: theater-service-docs
+              uri: lb://THEATER-SERVICE
+              predicates:
+                - Path=/api-docs/theater-service
+              filters:
+                - RewritePath=/api-docs/theater-service, /v3/api-docs
+            - id: booking-service-docs
+              uri: lb://BOOKING-SERVICE
+              predicates:
+                - Path=/api-docs/booking-service
+              filters:
+                - RewritePath=/api-docs/booking-service, /v3/api-docs
+            - id: payment-service-docs
+              uri: lb://PAYMENT-SERVICE
+              predicates:
+                - Path=/api-docs/payment-service
+              filters:
+                - RewritePath=/api-docs/payment-service, /v3/api-docs
+            - id: notification-service-docs
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api-docs/notification-service
+              filters:
+                - RewritePath=/api-docs/notification-service, /v3/api-docs
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: user-service
+        url: /api-docs/user-service
+      - name: movie-service
+        url: /api-docs/movie-service
+      - name: theater-service
+        url: /api-docs/theater-service
+      - name: booking-service
+        url: /api-docs/booking-service
+      - name: payment-service
+        url: /api-docs/payment-service
+      - name: notification-service
+        url: /api-docs/notification-service
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO

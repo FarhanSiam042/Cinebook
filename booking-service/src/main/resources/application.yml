@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: booking-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  datasource:
+    url: jdbc:mysql://localhost:3310/booking_db
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+server:
+  port: 8084
+  forward-headers-strategy: framework
+app:
+  jwt:
+    secret: c2FtcGxlLWpzdy1zZWNyZXQtZm9yLWNpbmVib29rLXVzZXItc2VydmljZS0zMi1ieXRlcyEh

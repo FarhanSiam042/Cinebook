@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: jdbc:mysql://localhost:3311/payment_db
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+server:
+  port: 8085
