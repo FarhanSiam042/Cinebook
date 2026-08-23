@@ -2,12 +2,11 @@
 
 CineBook is a full-stack movie ticket booking system built as a Spring Boot microservices
 architecture with a React frontend. A customer can browse movies and theaters, pick a showtime,
-select specific seats on a live seat map, and book — payment and confirmation are then processed
+select specific seats on a live seat map, and book, payment and confirmation are then processed
 automatically through an event-driven backend. An admin dashboard manages the entire catalog:
 movies, theaters, screens, seats, users, and a system-wide view of every booking, payment, and
 notification.
 
-**Course:** SWE 4602 – Software Design and Architecture
 
 ---
 
