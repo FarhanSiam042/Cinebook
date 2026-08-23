@@ -3,6 +3,7 @@ package com.cinebook.bookingservice.dto;
 import com.cinebook.bookingservice.model.BookingStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record BookingResponse(
 		Long id,
@@ -15,6 +16,8 @@ public record BookingResponse(
 		String theaterName,
 		LocalDateTime showTime,
 		Integer seatCount,
+		List<Long> seatIds,
+		List<String> seatLabels,
 		BigDecimal amount,
 		BookingStatus status,
 		LocalDateTime createdAt,

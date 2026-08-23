@@ -128,7 +128,14 @@ export default function BookingDetail() {
               label="Showtime"
               value={booking.showTime ? new Date(booking.showTime).toLocaleString() : '—'}
             />
-            <Row label="Seats" value={booking.seatCount} />
+            <Row
+              label="Seats"
+              value={
+                booking.seatLabels?.length
+                  ? `${booking.seatLabels.join(', ')} (${booking.seatCount})`
+                  : booking.seatCount
+              }
+            />
             <Row label="Amount" value={`$${Number(booking.amount).toFixed(2)}`} />
             <Row label="Booked by" value={`${booking.customerName} (${booking.customerEmail})`} />
             <Row

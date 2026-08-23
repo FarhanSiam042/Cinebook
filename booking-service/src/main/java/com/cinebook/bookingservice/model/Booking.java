@@ -1,17 +1,24 @@
 package com.cinebook.bookingservice.model;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -57,6 +64,22 @@ public class Booking {
 
 	@Column(nullable = false)
 	private Integer seatCount;
+
+	// EAGER is deliberate: these lists are tiny (at most a few dozen seats) and need to be
+	// readable by Jackson after the request's transaction/session has closed.
+	@ElementCollection(fetch = FetchType.EAGER)
+	@CollectionTable(name = "booking_seats", joinColumns = @JoinColumn(name = "booking_id"))
+	@OrderColumn(name = "seat_order")
+	@Column(name = "seat_id", nullable = false)
+	@Builder.Default
+	private List<Long> seatIds = new ArrayList<>();
+
+	@ElementCollection(fetch = FetchType.EAGER)
+	@CollectionTable(name = "booking_seat_labels", joinColumns = @JoinColumn(name = "booking_id"))
+	@OrderColumn(name = "seat_order")
+	@Column(name = "seat_label", nullable = false)
+	@Builder.Default
+	private List<String> seatLabels = new ArrayList<>();
 
 	@Column(nullable = false, precision = 12, scale = 2)
 	private BigDecimal amount;

@@ -2,15 +2,16 @@ package com.cinebook.bookingservice.service.impl;
 
 import com.cinebook.bookingservice.config.RabbitConfig;
 import com.cinebook.bookingservice.dto.BookingResponse;
+import com.cinebook.bookingservice.dto.ConfirmHoldRequest;
 import com.cinebook.bookingservice.dto.CreateBookingRequest;
 import com.cinebook.bookingservice.dto.MovieInfoResponse;
-import com.cinebook.bookingservice.dto.ScreenInfoResponse;
 import com.cinebook.bookingservice.dto.ShowtimeInfoResponse;
 import com.cinebook.bookingservice.dto.TheaterInfoResponse;
 import com.cinebook.bookingservice.event.BookingConfirmedEvent;
 import com.cinebook.bookingservice.exception.BookingNotFoundException;
 import com.cinebook.bookingservice.exception.ExternalServiceException;
 import com.cinebook.bookingservice.feign.MovieClient;
+import com.cinebook.bookingservice.feign.SeatLockClient;
 import com.cinebook.bookingservice.feign.TheaterClient;
 import com.cinebook.bookingservice.model.Booking;
 import com.cinebook.bookingservice.model.BookingStatus;
@@ -33,6 +34,7 @@ public class BookingServiceImpl implements BookingService {
 	private final BookingRepository bookingRepository;
 	private final MovieClient movieClient;
 	private final TheaterClient theaterClient;
+	private final SeatLockClient seatLockClient;
 	private final RabbitTemplate rabbitTemplate;
 
 	@Override
@@ -41,15 +43,17 @@ public class BookingServiceImpl implements BookingService {
 		ShowtimeInfoResponse showtime = fetchShowtime(request.showtimeId());
 		MovieInfoResponse movie = fetchMovie(showtime.movieId());
 		TheaterInfoResponse theater = fetchTheater(showtime.theaterId());
-		ScreenInfoResponse screen = fetchScreen(showtime.screenId());
-		validateSeatAvailability(screen, request.seatCount());
 
+		String bookingReference = UUID.randomUUID().toString();
+		confirmSeatHold(request.holdToken(), bookingReference);
+
+		int seatCount = request.seatIds().size();
 		BigDecimal amount = showtime.price()
-				.multiply(BigDecimal.valueOf(request.seatCount()))
+				.multiply(BigDecimal.valueOf(seatCount))
 				.setScale(2, RoundingMode.HALF_UP);
 
 		Booking booking = Booking.builder()
-				.bookingReference(UUID.randomUUID().toString())
+				.bookingReference(bookingReference)
 				.customerName(request.customerName())
 				.customerEmail(request.customerEmail())
 				.movieId(movie.id())
@@ -57,7 +61,9 @@ public class BookingServiceImpl implements BookingService {
 				.theaterId(theater.id())
 				.theaterName(theater.name())
 				.showTime(showtime.startTime())
-				.seatCount(request.seatCount())
+				.seatCount(seatCount)
+				.seatIds(request.seatIds())
+				.seatLabels(request.seatLabels() != null ? request.seatLabels() : List.of())
 				.amount(amount)
 				.status(BookingStatus.CONFIRMED)
 				.build();
@@ -114,22 +120,18 @@ public class BookingServiceImpl implements BookingService {
 		}
 	}
 
-	private ScreenInfoResponse fetchScreen(Long screenId) {
+	// Converts the caller's seat hold into a permanent reservation in seat-lock-service.
+	// The hold token is the only proof of ownership required here -- see seat-lock-service's
+	// SecurityConfig for why that confirm endpoint is intentionally unauthenticated.
+	private void confirmSeatHold(String holdToken, String bookingReference) {
 		try {
-			return theaterClient.getScreenById(screenId);
+			seatLockClient.confirm(holdToken, new ConfirmHoldRequest(bookingReference));
+		}
+		catch (FeignException.NotFound | FeignException.Gone exception) {
+			throw new ExternalServiceException("Your seat hold has expired. Please reselect your seats and try again.");
 		}
 		catch (FeignException exception) {
-			throw new ExternalServiceException("Unable to load screen " + screenId + ": " + exception.getMessage());
-		}
-	}
-
-	// Checks the screen's physical capacity, not real-time remaining availability --
-	// this project doesn't track individual seat reservations per showtime yet.
-	private void validateSeatAvailability(ScreenInfoResponse screen, Integer requestedSeats) {
-		int capacity = screen.totalRows() * screen.seatsPerRow();
-		if (requestedSeats > capacity) {
-			throw new ExternalServiceException(
-					"Requested " + requestedSeats + " seats exceeds screen capacity of " + capacity);
+			throw new ExternalServiceException("Unable to confirm seat hold: " + exception.getMessage());
 		}
 	}
 
@@ -167,6 +169,8 @@ public class BookingServiceImpl implements BookingService {
 				booking.getTheaterName(),
 				booking.getShowTime(),
 				booking.getSeatCount(),
+				booking.getSeatIds(),
+				booking.getSeatLabels(),
 				booking.getAmount(),
 				booking.getStatus(),
 				booking.getCreatedAt(),
