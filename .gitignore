@@ -28,3 +28,5 @@ target/
 .idea/
 .vscode/
 .DS_Store
+
+media-service/media-storage/

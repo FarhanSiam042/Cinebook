@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as moviesApi from '../../api/movies'
 import * as theatersApi from '../../api/theaters'
+import * as mediaApi from '../../api/media'
 import { extractErrorMessage } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import {
@@ -37,6 +38,7 @@ export default function AdminMovies() {
   const [form, setForm] = useState(emptyMovieForm)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadingPoster, setUploadingPoster] = useState(false)
 
   const [managing, setManaging] = useState(null) // movie being managed (showtimes/cast)
 
@@ -107,6 +109,22 @@ export default function AdminMovies() {
       setFormError(extractErrorMessage(err))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handlePosterFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingPoster(true)
+    try {
+      const uploaded = await mediaApi.uploadImage(file)
+      setForm((f) => ({ ...f, posterUrl: uploaded.url }))
+      toast.success('Poster uploaded.')
+    } catch (err) {
+      toast.error(extractErrorMessage(err))
+    } finally {
+      setUploadingPoster(false)
     }
   }
 
@@ -212,12 +230,48 @@ export default function AdminMovies() {
             value={form.rating}
             onChange={(e) => setForm((f) => ({ ...f, rating: e.target.value }))}
           />
-          <Input
-            label="Poster URL"
-            className="sm:col-span-2"
-            value={form.posterUrl}
-            onChange={(e) => setForm((f) => ({ ...f, posterUrl: e.target.value }))}
-          />
+          <div className="flex flex-col gap-1.5 text-sm sm:col-span-2">
+            <span className="font-medium text-slate-300">Poster</span>
+            <div className="flex items-center gap-3">
+              {form.posterUrl ? (
+                <img
+                  src={form.posterUrl}
+                  alt="Poster preview"
+                  className="h-24 w-16 rounded-md border border-slate-700 object-cover"
+                />
+              ) : (
+                <div className="flex h-24 w-16 items-center justify-center rounded-md border border-dashed border-slate-700 text-xs text-slate-600">
+                  No poster
+                </div>
+              )}
+              <div className="flex flex-col items-start gap-1.5">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-700">
+                  {uploadingPoster ? 'Uploading…' : 'Upload image'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    disabled={uploadingPoster}
+                    onChange={handlePosterFile}
+                  />
+                </label>
+                {form.posterUrl && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-500 hover:text-red-400"
+                    onClick={() => setForm((f) => ({ ...f, posterUrl: '' }))}
+                  >
+                    Remove poster
+                  </button>
+                )}
+              </div>
+            </div>
+            <Input
+              placeholder="…or paste an image URL"
+              value={form.posterUrl}
+              onChange={(e) => setForm((f) => ({ ...f, posterUrl: e.target.value }))}
+            />
+          </div>
           <Input
             label="Genres (comma separated)"
             className="sm:col-span-2"

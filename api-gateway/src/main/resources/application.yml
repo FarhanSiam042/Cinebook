@@ -36,6 +36,10 @@ spring:
               uri: lb://NOTIFICATION-SERVICE
               predicates:
                 - Path=/api/notifications/**
+            - id: media-service
+              uri: lb://MEDIA-SERVICE
+              predicates:
+                - Path=/api/media/**
             - id: user-service-docs
               uri: lb://USER-SERVICE
               predicates:
@@ -72,6 +76,12 @@ spring:
                 - Path=/api-docs/notification-service
               filters:
                 - RewritePath=/api-docs/notification-service, /v3/api-docs
+            - id: media-service-docs
+              uri: lb://MEDIA-SERVICE
+              predicates:
+                - Path=/api-docs/media-service
+              filters:
+                - RewritePath=/api-docs/media-service, /v3/api-docs
           globalcors:
             add-to-simple-url-handler-mapping: true
             cors-configurations:
@@ -119,6 +129,8 @@ springdoc:
         url: /api-docs/payment-service
       - name: notification-service
         url: /api-docs/notification-service
+      - name: media-service
+        url: /api-docs/media-service
 
 logging:
   level:

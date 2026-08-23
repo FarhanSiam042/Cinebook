@@ -1,0 +1,43 @@
+server:
+  port: 8087
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: media-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    secret: c2FtcGxlLWpzdy1zZWNyZXQtZm9yLWNpbmVib29rLXVzZXItc2VydmljZS0zMi1ieXRlcyEh
+  media:
+    storage-location: media-storage
+    public-base-url: http://localhost:8080
